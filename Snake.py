@@ -10,6 +10,8 @@ win = pygame.display.set_mode((900,900))
 font = pygame.font.SysFont("comicsans", 30, True)
 pygame.display.set_caption("Snake")
 clock = pygame.time.Clock()
+generation = 0
+creature = 0
 images = {
     'up': pygame.image.load('head_up.png'),
     'right': pygame.image.load('head_right.png'),
@@ -50,10 +52,11 @@ class Snake():
         self.vel = 30
         self.x = x
         self.y = y
+        self.number_of_moves = 0
         self.head = Block(self.x, self.y, 'right')
-        self.direction = self.head.direction
+       
         self.body = [self.head]
-        self.fitness = 0
+        self.direction = self.head.direction
         self.genes = {
             'dist_to_food' : round(random.uniform(-1,1), 5),
             'dist_to_wall' : round(random.uniform(-1,1), 5),
@@ -86,35 +89,42 @@ class Snake():
         self.length+=1
     def update_genes(self, **kwargs):
         self.genes.update(kwargs)
-
+    def reset(self):
+        self.x = random.randint(10,20)*30
+        self.y = random.randint(10,20)*30
+        self.length = 1
+        self.number_of_moves = 0
+        self.direction = 'right'
+        self.body[0].direction = 'right'
     def move(self, direction):
-        init_x = snake.body[0].x
-        init_y = snake.body[0].y
-        snake.body[0].direction = direction
+        self.number_of_moves +=1
+        init_x = self.body[0].x
+        init_y = self.body[0].y
+        self.body[0].direction = direction
         if direction == 'right':
-            if snake.body[0].x == 870:
+            if self.body[0].x == 870:
                 return False
-            snake.body[0].x += snake.vel
+            self.body[0].x += self.vel
         if direction == 'left':
-            if snake.body[0].x == 0:
+            if self.body[0].x == 0:
                 return False
-            snake.body[0].x -= snake.vel
+            self.body[0].x -= self.vel
         if direction == 'up':
-            if snake.body[0].y == 0:
+            if self.body[0].y == 0:
                 return False
-            snake.body[0].y -= snake.vel
+            self.body[0].y -= self.vel
         if direction == 'down':
-            if snake.body[0].y == 870:
+            if self.body[0].y == 870:
                 return False
-            snake.body[0].y += snake.vel
-        if snake.length>1:
-            if snake.collision():
+            self.body[0].y += self.vel
+        if self.length>1:
+            if self.collision():
                 return 1
-            for i in range(1, snake.length):
-                curr_x = snake.body[i].x
-                curr_y = snake.body[i].y
-                snake.body[i].x = init_x
-                snake.body[i].y = init_y
+            for i in range(1, self.length):
+                curr_x = self.body[i].x
+                curr_y = self.body[i].y
+                self.body[i].x = init_x
+                self.body[i].y = init_y
                 init_x = curr_x
                 init_y = curr_y
         self.x = self.body[0].x
@@ -123,25 +133,51 @@ class Snake():
     def draw(self, win):
         for x in self.body:
             x.draw(win)
+    def condition(self):
+        if self.length*100 - self.number_of_moves > 0:
+            return True
+        return False
     def get_cords(self):
         coords = [body.get_cords() for body in self.body]
         return coords
     def best_move(self):
         ratings = {}
-        init_x = self.x
-        init_y = self.y
-        directions = ['right', 'left', 'down', 'up']
-        for direction in directions:
+        init_moves = self.number_of_moves
+        init_coords = self.get_cords()
+        init_dir = self.body[0].direction
+        rating = 0
+        all_directions = ['right', 'left', 'down', 'up']
+        if init_dir == 'right':
+            all_directions.remove('left')
+        if init_dir == 'left':
+            all_directions.remove('right')
+        if init_dir == 'down':
+            all_directions.remove('up')
+        if init_dir == 'up':
+            all_directions.remove('down')
+        for direction in all_directions:
+            '''
+            if not self.move(direction):
+                ratings[direction] = -500
+                for x in range(self.length):
+                    self.body[x].x = init_coords[x][0]
+                    self.body[x].y = init_coords[x][1]
+                self.body[0].direction = init_dir
+                continue
+            '''
             self.move(direction)
-            '''
-            Get current values from environment
-            Multiply them with genes
-            Summ = rating of move
-            '''
-            rating += 1
+            rating = get_dist_to_body(self)*self.genes['dist_to_body']
+            rating += get_dist_to_food(self, eat) * self.genes['dist_to_food']
+            rating += get_dist_to_wall(self) * self.genes['dist_to_wall']
+            rating += self.length * self.genes['length']
             ratings[direction] = rating
-            self.x = init_x
-            self.y = init_y
+            rating = 0
+            for x in range(self.length):
+                self.body[x].x = init_coords[x][0]
+                self.body[x].y = init_coords[x][1]
+            self.body[0].direction = init_dir
+            self.direction = init_dir
+            self.number_of_moves = init_moves
         return max(ratings, key=ratings.get)
     def collision(self):
         coords = [body.get_cords() for body in self.body]
@@ -149,16 +185,21 @@ class Snake():
             return True
         else:
             return False
-def redraw():
+def redraw(snake_obj, food_obj):
     win.fill((0, 0, 0))   
-    eat.draw(win)
-    snake.draw(win)
-    text = font.render("Score: " + str(snake.length-1), 1, (0,255,0))
+    food_obj.draw(win)
+    snake_obj.draw(win)
+    text = font.render("Score: " + str(snake_obj.length-1), 1, (0,255,0))
+    gen_text = font.render("Current generation: " + str(generation), 1, (0,255,0))
+    creature_text = font.render("Current creature: " + str(creature), 1, (0,255,0))
     win.blit(text, (390, 10))
+    win.blit(gen_text, (390, 30))
+    win.blit(creature_text, (390, 50))
     pygame.display.update()
 
 snake = Snake(120, 120)
 eat = Food()
+
 # run = True
 def get_dist_to_food(snake_obj, food_obj):
     return abs(pow(((snake_obj.x - food_obj.x)**2 - (snake_obj.y - food_obj.y)**2), 0.5))
@@ -192,19 +233,16 @@ def get_dist_to_body(snake_obj):
             if snake_obj.y == x[1] and snake_obj.x > x[0]:
                 return abs(snake_obj.x - x[0])
     return 900
-def game(player, show):
-    snake = player
-    draw_check = show
+def game(snake):
     global eat
+    eat = Food()
     run = True
     while run:
         if snake.collision():
                 return 1
-        # snake.best_move()
-        '''
-        if not snake.move(snake.direction):
+        if not snake.move(snake.best_move()):
             return 1
-        '''
+    
         clock.tick(10)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -212,8 +250,9 @@ def game(player, show):
         if eat.x == snake.body[0].x and eat.y == snake.body[0].y:
             snake.add()
             eat = Food()
-            
+
         keys = pygame.key.get_pressed()
+        '''
         if keys[pygame.K_RIGHT]:
             snake.direction = 'right'
             if not snake.move(snake.direction):
@@ -233,29 +272,64 @@ def game(player, show):
             snake.direction = 'up'
             if not snake.move(snake.direction):
                 return 1
+        
         if keys[pygame.K_SPACE]:
-            print(get_dist_to_body(snake))
-            print(get_dist_to_food(snake, eat))
-            print(get_dist_to_wall(snake))
-        if draw_check:
-            redraw()
-    return 1
+            print(snake.best_move())
+        '''
+        if keys[pygame.K_g]:
+            return 1
 
-while game(snake, True):
+        redraw(snake, eat)
+    return 1
+'''
+while game(snake):
     snake = Snake(120, 120)
     eat = Food()
-    game(snake, True)
-
-
-def population(size):
+    game(snake)
+'''
+def create_population(size):
     population_snakes = []
-    for x in range(0,size):
-        population_snakes[x] = Snake(random.randint(10, 20)*30, random.randint(10, 20)*30)
+    for _ in range(size):
+        population_snakes.append(Snake(random.randint(5, 25)*30, random.randint(5, 25)*30))
     return population_snakes
+def create_child(dad, mom):
+    mutation_rate = 0.05
+    genes = {
+        'dist_to_food': random.choice([dad.genes['dist_to_food'], mom.genes['dist_to_food']]),
+        'dist_to_wall': random.choice([dad.genes['dist_to_wall'], mom.genes['dist_to_wall']]),
+        'dist_to_body': random.choice([dad.genes['dist_to_body'], mom.genes['dist_to_body']]),
+        'length': random.choice([dad.genes['length'], mom.genes['length']])
+    }
+    for x in genes.keys():
+        if random.random() <= mutation_rate:
+            genes[x] += random.uniform(-1,1)
+    child = Snake(random.randint(5, 25)*30, random.randint(5, 25)*30)
+    child.update_genes(**genes)
+    return child
 
+def evolve(population):
+    size = len(population)
+    while (len(population) > size / 2):
+        population.pop()
+    while (len(population) < size):
+        population.append(create_child(random.choice(population), random.choice(population)))
+    return population
 
-def evolution(population, num_generations):
-    for y in range(num_generations):
-
-        for x in population:
-            game(x, True)
+def evolution(population):
+    global generation
+    global eat
+    generation += 1
+    global creature
+    while generation < 20:
+        population_by_fitness = []
+        for x in range(len(population)):
+            creature = x+1
+            if game(population[x]):
+                population_by_fitness.append(population[x])
+                population[x].reset()
+            
+        population_by_fitness.sort(key=lambda x: x.length*100 - x.number_of_moves)
+        population = evolve(population)
+        creature = 0
+        generation+=1
+evolution(create_population(20))
