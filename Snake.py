@@ -58,10 +58,10 @@ class Snake():
         self.body = [self.head]
         self.direction = self.head.direction
         self.genes = {
-            'dist_to_food' : round(random.uniform(-1,1), 5),
-            'dist_to_wall' : round(random.uniform(-1,1), 5),
-            'dist_to_body' : round(random.uniform(-1,1), 5),
-            'length' : round(random.uniform(-1,1), 5)
+            'dist_to_food' : round(random.uniform(-3,3), 5),
+            'dist_to_wall' : round(random.uniform(-3,3), 5),
+            'dist_to_body' : round(random.uniform(-3,3), 5),
+            'length' : round(random.uniform(-3,3), 5)
         }
     def add(self):
         if self.length == 1:
@@ -95,6 +95,8 @@ class Snake():
         self.length = 1
         self.number_of_moves = 0
         self.direction = 'right'
+        self.head = Block(self.x, self.y, 'right')
+        self.body = [self.head]
         self.body[0].direction = 'right'
     def move(self, direction):
         self.number_of_moves +=1
@@ -237,12 +239,15 @@ def game(snake):
     global eat
     eat = Food()
     run = True
+    available_moves = 100
     while run:
         if snake.collision():
                 return 1
         if not snake.move(snake.best_move()):
             return 1
-    
+        available_moves-=1
+        if available_moves<0:
+            return 1
         clock.tick(10)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -250,6 +255,7 @@ def game(snake):
         if eat.x == snake.body[0].x and eat.y == snake.body[0].y:
             snake.add()
             eat = Food()
+            available_moves+=200
 
         keys = pygame.key.get_pressed()
         '''
@@ -323,13 +329,13 @@ def evolution(population):
     while generation < 20:
         population_by_fitness = []
         for x in range(len(population)):
+            population[x].reset()
             creature = x+1
             if game(population[x]):
                 population_by_fitness.append(population[x])
-                population[x].reset()
-            
-        population_by_fitness.sort(key=lambda x: x.length*100 - x.number_of_moves)
+        population_by_fitness.sort(key=lambda x: x.length*1000 - x.number_of_moves)
         population = evolve(population)
         creature = 0
         generation+=1
+    return population[0].genes
 evolution(create_population(20))
