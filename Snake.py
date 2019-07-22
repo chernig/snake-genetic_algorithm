@@ -1,5 +1,5 @@
 '''
-Usual snake game
+Usual snake game with genetic algorithm
 '''
 import pygame
 import random
@@ -20,12 +20,13 @@ images = {
     'body': pygame.image.load('body.png'),
     'food': pygame.image.load('food.png')
 }
-
+# Food class that snake should eat to get bigger
 class Food():
     def __init__(self):
         self.x = 30*random.randint(0,29)
         self.y = 30*random.randint(0,29)
         allow = False
+        # Prevent food object to spawn inside a snake object
         while not allow:
             if [self.x, self.y] not in snake.get_cords():
                 allow = True
@@ -36,6 +37,7 @@ class Food():
         win.blit(images['food'], (self.x, self.y))
     def get_cords(self):
         return [self.x, self.y]
+# Snake consists of blocks
 class Block():
     def __init__(self, x, y, direction):
         self.x = x
@@ -46,6 +48,7 @@ class Block():
     def draw(self, win):
         win.blit(images[self.direction], (self.x, self.y))
 
+# The snake class
 class Snake():
     def __init__(self, x, y):
         self.length = 1
@@ -57,12 +60,15 @@ class Snake():
        
         self.body = [self.head]
         self.direction = self.head.direction
+        # Genes for genetic algorithm that should be optimized
         self.genes = {
             'dist_to_food' : round(random.uniform(-3,3), 5),
             'dist_to_wall' : round(random.uniform(-3,3), 5),
             'dist_to_body' : round(random.uniform(-3,3), 5),
         }
+    # Function to add a new block to the existing snake object
     def add(self):
+        # We want our snake to add a new block based on its direction; overwise they might appear right in front of head or spawn outside the "map"
         if self.length == 1:
             angle = self.body[0].direction
             if angle == 'down':
@@ -74,6 +80,7 @@ class Snake():
             elif angle =='right':
                 node = Block(self.body[len(self.body)-1].x - self.vel, self.body[len(self.body)-1].y, 'body')
         else:
+            # Add a new block based on snake's move direction to avoid random collisions
             angle_x = self.body[(self.length-1)].x - self.body[(self.length-2)].x
             angle_y = self.body[(self.length-1)].y - self.body[(self.length-2)].y
             if angle_x > 0:
@@ -88,6 +95,7 @@ class Snake():
         self.length+=1
     def update_genes(self, **kwargs):
         self.genes.update(kwargs)
+    # Reset function for making a snake object "default" (except genes)
     def reset(self):
         self.x = random.randint(10,20)*30
         self.y = random.randint(10,20)*30
@@ -97,6 +105,7 @@ class Snake():
         self.head = Block(self.x, self.y, 'right')
         self.body = [self.head]
         self.body[0].direction = 'right'
+    # Moves the snake forward based on its direction
     def move(self, direction):
         self.number_of_moves +=1
         init_x = self.body[0].x
@@ -118,6 +127,7 @@ class Snake():
             if self.body[0].y == 870:
                 return False
             self.body[0].y += self.vel
+        # Moves other parts of the snake (body) 
         if self.length>1:
             if self.collision():
                 return 1
@@ -134,19 +144,17 @@ class Snake():
     def draw(self, win):
         for x in self.body:
             x.draw(win)
-    def condition(self):
-        if self.length*100 - self.number_of_moves > 0:
-            return True
-        return False
     def get_cords(self):
         coords = [body.get_cords() for body in self.body]
         return coords
+    # Predict the best possible move based on its genes
     def best_move(self):
         ratings = {}
         init_moves = self.number_of_moves
         init_coords = self.get_cords()
         init_dir = self.body[0].direction
         rating = 0
+        # Prevent snake from moving inside its body (opposite direction)
         all_directions = ['right', 'left', 'down', 'up']
         if init_dir == 'right':
             all_directions.remove('left')
@@ -157,21 +165,13 @@ class Snake():
         if init_dir == 'up':
             all_directions.remove('down')
         for direction in all_directions:
-            '''
-            if not self.move(direction):
-                ratings[direction] = -500
-                for x in range(self.length):
-                    self.body[x].x = init_coords[x][0]
-                    self.body[x].y = init_coords[x][1]
-                self.body[0].direction = init_dir
-                continue
-            '''
             self.move(direction)
             rating = get_dist_to_body(self)*self.genes['dist_to_body']
             rating += get_dist_to_food(self, eat) * self.genes['dist_to_food']
             rating += get_dist_to_wall(self) * self.genes['dist_to_wall']
             ratings[direction] = rating
             rating = 0
+            # After making a move and calculating its rating, we want our snake to get back to its original location
             for x in range(self.length):
                 self.body[x].x = init_coords[x][0]
                 self.body[x].y = init_coords[x][1]
@@ -179,6 +179,7 @@ class Snake():
             self.direction = init_dir
             self.number_of_moves = init_moves
         return max(ratings, key=ratings.get)
+    # Check if snake collided with its body
     def collision(self):
         coords = [body.get_cords() for body in self.body]
         if self.head.get_cords() in coords[1:]:
@@ -192,17 +193,17 @@ def redraw(snake_obj, food_obj):
     text = font.render("Score: " + str(snake_obj.length-1), 1, (0,255,0))
     gen_text = font.render("Current generation: " + str(generation), 1, (0,255,0))
     creature_text = font.render("Current creature: " + str(creature), 1, (0,255,0))
-    genes_table = font.render("Genes of the creature: " + str(snake_obj.genes), 1 , (0,255,0))
+    # genes_table = font.render("Genes of the creature: " + str(snake_obj.genes), 1 , (0,255,0))
     # win.blit(genes_table, (100, 10))
     win.blit(text, (390, 10))
     win.blit(gen_text, (390, 30))
     win.blit(creature_text, (390, 50))
     pygame.display.update()
-
+# Some test variables
 snake = Snake(120, 120)
 eat = Food()
 
-# run = True
+# Functions to get a necessary value from environment
 def get_dist_to_food(snake_obj, food_obj):
     return abs(pow(((snake_obj.x - food_obj.x)**2 - (snake_obj.y - food_obj.y)**2), 0.5))
 def get_dist_to_wall(snake_obj):
@@ -235,10 +236,14 @@ def get_dist_to_body(snake_obj):
             if snake_obj.y == x[1] and snake_obj.x > x[0]:
                 return abs(snake_obj.x - x[0])
     return 900
+
+
+# The actual game
 def game(snake):
     global eat
     eat = Food()
     run = True
+    # Moves restriction to avoid unlimited games
     available_moves = 100
     while run:
         if snake.collision():
@@ -252,12 +257,14 @@ def game(snake):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
+        # If snake object has the same coordinates as food object - food is considered to be eaten
         if eat.x == snake.body[0].x and eat.y == snake.body[0].y:
             snake.add()
             eat = Food()
-            available_moves+=200
+            available_moves += 200
 
         keys = pygame.key.get_pressed()
+        # Additional parameters for playing manually
         '''
         if keys[pygame.K_RIGHT]:
             snake.direction = 'right'
@@ -287,17 +294,22 @@ def game(snake):
 
         redraw(snake, eat)
     return 1
+# Additional game loop to play manually
 '''
 while game(snake):
     snake = Snake(120, 120)
     eat = Food()
     game(snake)
 '''
+
+# Creates population of the desired size
 def create_population(size):
     population_snakes = []
     for _ in range(size):
         population_snakes.append(Snake(random.randint(5, 25)*30, random.randint(5, 25)*30))
     return population_snakes
+
+# Creating a new object based on the best values from previous generation
 def create_child(dad, mom):
     mutation_rate = 0.05
     genes = {
@@ -312,6 +324,7 @@ def create_child(dad, mom):
     child.update_genes(**genes)
     return child
 
+# Delete the worst genomes, replace them with "children" of the best genomes
 def evolve(population):
     size = len(population)
     while (len(population) > size / 2):
@@ -319,8 +332,12 @@ def evolve(population):
     while (len(population) < size):
         population.append(create_child(population[0], population[random.randint(1,9)]))
     return population
+
+# A snake is considered as the fittest if it has the most length in shortest number of moves
 def fitness(snake_obj):
     return ((snake_obj.length-1)*1000 - snake_obj.number_of_moves)
+
+# Evolution loop
 def evolution(population):
     global generation
     global eat
@@ -333,6 +350,7 @@ def evolution(population):
             creature = x+1
             if game(population[x]):
                 population_by_fitness.append(population[x])
+        # Sort population based on their fitness
         population_by_fitness.sort(key=lambda x: fitness(x), reverse = True)
         population = evolve(population)
         creature = 0
