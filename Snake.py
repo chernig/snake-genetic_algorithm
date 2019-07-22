@@ -61,7 +61,6 @@ class Snake():
             'dist_to_food' : round(random.uniform(-3,3), 5),
             'dist_to_wall' : round(random.uniform(-3,3), 5),
             'dist_to_body' : round(random.uniform(-3,3), 5),
-            'length' : round(random.uniform(-3,3), 5)
         }
     def add(self):
         if self.length == 1:
@@ -171,7 +170,6 @@ class Snake():
             rating = get_dist_to_body(self)*self.genes['dist_to_body']
             rating += get_dist_to_food(self, eat) * self.genes['dist_to_food']
             rating += get_dist_to_wall(self) * self.genes['dist_to_wall']
-            rating += self.length * self.genes['length']
             ratings[direction] = rating
             rating = 0
             for x in range(self.length):
@@ -194,6 +192,8 @@ def redraw(snake_obj, food_obj):
     text = font.render("Score: " + str(snake_obj.length-1), 1, (0,255,0))
     gen_text = font.render("Current generation: " + str(generation), 1, (0,255,0))
     creature_text = font.render("Current creature: " + str(creature), 1, (0,255,0))
+    genes_table = font.render("Genes of the creature: " + str(snake_obj.genes), 1 , (0,255,0))
+    # win.blit(genes_table, (100, 10))
     win.blit(text, (390, 10))
     win.blit(gen_text, (390, 30))
     win.blit(creature_text, (390, 50))
@@ -248,7 +248,7 @@ def game(snake):
         available_moves-=1
         if available_moves<0:
             return 1
-        clock.tick(10)
+        clock.tick(30)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
@@ -304,7 +304,6 @@ def create_child(dad, mom):
         'dist_to_food': random.choice([dad.genes['dist_to_food'], mom.genes['dist_to_food']]),
         'dist_to_wall': random.choice([dad.genes['dist_to_wall'], mom.genes['dist_to_wall']]),
         'dist_to_body': random.choice([dad.genes['dist_to_body'], mom.genes['dist_to_body']]),
-        'length': random.choice([dad.genes['length'], mom.genes['length']])
     }
     for x in genes.keys():
         if random.random() <= mutation_rate:
@@ -318,22 +317,23 @@ def evolve(population):
     while (len(population) > size / 2):
         population.pop()
     while (len(population) < size):
-        population.append(create_child(random.choice(population), random.choice(population)))
+        population.append(create_child(population[0], population[random.randint(1,9)]))
     return population
-
+def fitness(snake_obj):
+    return ((snake_obj.length-1)*1000 - snake_obj.number_of_moves)
 def evolution(population):
     global generation
     global eat
     generation += 1
     global creature
-    while generation < 20:
+    while generation < 200:
         population_by_fitness = []
         for x in range(len(population)):
             population[x].reset()
             creature = x+1
             if game(population[x]):
                 population_by_fitness.append(population[x])
-        population_by_fitness.sort(key=lambda x: x.length*1000 - x.number_of_moves)
+        population_by_fitness.sort(key=lambda x: fitness(x), reverse = True)
         population = evolve(population)
         creature = 0
         generation+=1
